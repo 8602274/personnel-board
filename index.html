@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e3a8a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="인원배치">
+<title>인원배치현황판</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{
+  --bg:#eef1f6; --card:#fff; --ink:#1b2333; --ink2:#5b6475; --line:#d6dbe5;
+  --navy:#1e3a8a; --navy2:#2b4fb3; --head:#1f2937; --ok:#0f7a3d; --warn:#b45309; --red:#c62828; --blue:#1565c0;
+  --chip:#e8edf8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+body{padding:0 0 calc(92px + env(safe-area-inset-bottom))}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input{font:inherit;color:inherit}
+
+/* 위 띠 */
+.top{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.top h1{margin:0;font-size:18px;display:flex;align-items:center;gap:8px}
+.top h1 .sp{flex:1}
+.top h1 button{color:#fff;font-size:21px;padding:2px 6px;border-radius:8px}
+.dnav{display:flex;align-items:center;gap:6px;margin-top:8px}
+.dnav .arw{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.14);font-size:20px;color:#fff}
+.dbox{flex:1;position:relative;height:44px;border-radius:12px;background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px}
+.dbox input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
+.dbox .wd.sat{color:var(--blue)} .dbox .wd.sun{color:var(--red)}
+.today{height:44px;padding:0 10px;border-radius:12px;background:rgba(255,255,255,.14);color:#fff;font-size:14px}
+
+/* 상태 띠 */
+.state{margin:10px 12px 0;padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.45;display:flex;gap:8px;align-items:flex-start}
+.state.saved{background:#e3f4ea;color:#0b5b2e}
+.state.prev{background:#fff4dd;color:#7a4b00}
+.state.dirty{background:#fde8e8;color:#8f1d1d}
+.state.empty{background:#eceff4;color:var(--ink2)}
+
+/* 현황판 */
+.board{margin:10px 12px;background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
+.sum{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid var(--head)}
+.sum>div{padding:12px 10px 10px;text-align:center}
+.sum>div+div{border-left:2px solid var(--head)}
+.sum .lb{font-size:14px;color:var(--ink2);font-weight:700}
+.sum .big{font-size:34px;font-weight:800;line-height:1.1;margin-top:4px}
+.sum .big small{font-size:15px;font-weight:700;margin-left:2px;color:var(--ink2)}
+.sum .sub{font-size:13px;color:var(--ink2);margin-top:2px;min-height:18px}
+.sum .sub.bad{color:var(--red);font-weight:700}
+.stepper{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px}
+.stepper button{width:44px;height:44px;border-radius:50%;background:var(--chip);font-size:24px;font-weight:700;color:var(--navy)}
+.stepper button:active{background:#cfd9f0}
+.num{width:64px;height:48px;text-align:center;font-size:28px;font-weight:800;border:2px solid var(--line);border-radius:12px;background:#fff}
+.num:focus{outline:none;border-color:var(--navy2)}
+.num.changed{border-color:#f59e0b;background:#fffaf0}
+.thead{display:grid;grid-template-columns:1fr 172px;background:var(--head);color:#fff;font-size:14px;font-weight:700}
+.thead div{padding:8px 12px}.thead div+div{text-align:center}
+.row{display:grid;grid-template-columns:1fr 172px;border-top:1px solid var(--line);align-items:center;min-height:64px}
+.row .nm{padding:8px 12px;font-size:17px;font-weight:700}
+.row .nm .memo{display:block;font-size:13px;font-weight:400;color:var(--warn);margin-top:2px;word-break:break-all}
+.row .nm .mbtn{font-size:12px;font-weight:400;color:var(--ink2);margin-left:6px;padding:2px 6px;border-radius:8px;background:#f1f3f7}
+.row .stepper{margin:0;gap:4px}
+.row .stepper button{width:42px;height:42px;font-size:22px}
+.row .num{width:58px;height:44px;font-size:24px}
+.foot{padding:8px 12px 12px;text-align:right;font-weight:800;color:var(--ink2);letter-spacing:.5px}
+
+/* 아래 단추 */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:#fff;border-top:1px solid var(--line);
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:8px}
+.bar button{height:52px;border-radius:14px;font-weight:800;font-size:16px}
+.bar .save{flex:1.4;background:var(--navy);color:#fff}
+.bar .save.dim{background:#9aa6c2}
+.bar .share{flex:1;background:#fee500;color:#191600}
+.bar .more{width:52px;background:var(--chip);font-size:20px}
+
+/* 시트 */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;display:none}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:#fff;border-radius:18px 18px 0 0;max-height:88vh;overflow:auto;
+  padding:14px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .2s}
+.sheet.open{transform:none}
+.sheet h2{margin:0 0 10px;font-size:18px}
+.sheet .item{display:flex;align-items:center;gap:10px;width:100%;padding:14px 6px;border-bottom:1px solid #eef0f4;font-size:16px;text-align:left}
+.sheet .item small{display:block;color:var(--ink2);font-size:13px;margin-top:2px}
+.sheet .item .ic{font-size:22px;width:30px;text-align:center}
+.sheet .danger{color:var(--red)}
+.field{display:flex;gap:8px;align-items:center;margin:6px 0}
+.field label{width:52px;color:var(--ink2);font-size:14px}
+.field input{flex:1;height:42px;border:1px solid var(--line);border-radius:10px;padding:0 10px;font-size:16px}
+.btnrow{display:flex;gap:8px;margin-top:12px}
+.btnrow button{flex:1;height:48px;border-radius:12px;font-weight:700}
+.btn1{background:var(--navy);color:#fff}.btn2{background:var(--chip)}
+.hint{font-size:13px;color:var(--ink2);line-height:1.5;margin:6px 0}
+
+/* 달력 */
+.cal-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.cal-h button{width:40px;height:40px;border-radius:10px;background:var(--chip);font-size:18px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal .w{text-align:center;font-size:12px;color:var(--ink2);padding:4px 0}
+.cal .d{height:52px;border-radius:10px;background:#f6f7fa;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px}
+.cal .d.has{background:#e3f4ea}.cal .d.cur{outline:2px solid var(--navy)}
+.cal .d .n{font-size:11px;color:var(--ok);font-weight:700}
+.cal .d.sun{color:var(--red)}.cal .d.sat{color:var(--blue)}
+.cal .d.blank{background:none}
+
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(20,24,33,.92);color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>📋 인원배치현황판 <span class="sp"></span>
+    <button id="bCal" aria-label="달력">📅</button>
+  </h1>
+  <div class="dnav">
+    <button class="arw" id="bPrev" aria-label="전날">◀</button>
+    <label class="dbox"><span id="dText"></span><input type="date" id="dPick"></label>
+    <button class="arw" id="bNext" aria-label="다음날">▶</button>
+    <button class="today" id="bToday">오늘</button>
+  </div>
+</div>
+
+<div class="state empty" id="state"></div>
+
+<div class="board">
+  <div class="sum">
+    <div>
+      <div class="lb">총원</div>
+      <div class="stepper"><button data-k="total" data-d="-1">−</button><input class="num" id="total" inputmode="numeric" pattern="[0-9]*"><button data-k="total" data-d="1">+</button></div>
+      <div class="sub">명</div>
+    </div>
+    <div>
+      <div class="lb">투입인원</div>
+      <div class="big" id="inSum">0<small>명</small></div>
+      <div class="sub" id="outTxt"></div>
+    </div>
+  </div>
+  <div class="thead"><div>공정</div><div>인원</div></div>
+  <div id="rows"></div>
+  <div class="foot">T&amp;S</div>
+</div>
+
+<div class="bar">
+  <button class="more" id="bMore" aria-label="메뉴">☰</button>
+  <button class="share" id="bShare">📤 카톡 공유</button>
+  <button class="save" id="bSave">💾 저장</button>
+</div>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const APP_VERSION = 'v1.0.0';
+const KEY = 'personnel-board-v2';
+const WD = '일월화수목금토';
+const DEFAULT_CATS = ['관리', '납품', '조립', '가공', '보온', 'PIPE', '설계', '기타1', '기타2'];
+
+/* ───── 데이터 (PC 앱 투입인원_data.json 과 같은 모양) ───── */
+function blankData() { return {version: 2, cats: DEFAULT_CATS.map((n, i) => ({key: 'c' + (i + 1), name: n})), days: {}}; }
+let data;
+try { data = JSON.parse(localStorage.getItem(KEY)) || blankData(); } catch { data = blankData(); }
+if (!Array.isArray(data.cats) || !data.cats.length) data.cats = blankData().cats;
+data.days = data.days || {};
+function persist() { localStorage.setItem(KEY, JSON.stringify(data)); }
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, '0');
+const ds = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fromDs = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const label = d => `${d.getMonth() + 1}/${d.getDate()}(${WD[d.getDay()]})`;
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* '전일' — 평일이면 가장 가까운 이전 평일 입력일, 주말이면 가장 가까운 이전 입력일 (PC 앱과 같음) */
+function prevSource(d) {
+  const keys = Object.keys(data.days).filter(k => k < ds(d)).sort();
+  if (!keys.length) return null;
+  const wk = x => { const g = fromDs(x).getDay(); return g > 0 && g < 6; };
+  if (wk(ds(d))) for (let i = keys.length - 1; i >= Math.max(0, keys.length - 40); i--) if (wk(keys[i])) return keys[i];
+  return keys[keys.length - 1];
+}
+
+/* ───── 화면 상태 ───── */
+let cur = new Date(); cur.setHours(0, 0, 0, 0);
+let day = null;        // 화면에 보이는 날 {total, v, memo}
+let saved = false;     // 이 날이 저장돼 있나
+let dirty = false;     // 저장 뒤 바뀌었나
+let srcKey = null;     // 전일 값으로 채웠으면 그 날짜
+
+function showDate(d) {
+  cur = d;
+  const k = ds(d);
+  srcKey = null;
+  if (data.days[k]) {
+    const x = data.days[k];
+    day = {total: x.total ?? null, v: {...(x.v || {})}, memo: {...(x.memo || {})}};
+    saved = true;
+  } else {
+    srcKey = prevSource(d);
+    const s = srcKey ? data.days[srcKey] : {total: null, v: {}, memo: {}};
+    day = {total: s.total ?? null, v: {...(s.v || {})}, memo: {...(s.memo || {})}};
+    saved = false;
+  }
+  dirty = false;
+  render();
+}
+
+function sumIn() { return data.cats.reduce((a, c) => a + (Number(day.v[c.key]) || 0), 0); }
+
+function render() {
+  const g = cur.getDay();
+  $('dText').innerHTML = `${cur.getFullYear()}. ${cur.getMonth() + 1}. ${cur.getDate()} <span class="wd ${g === 0 ? 'sun' : g === 6 ? 'sat' : ''}">&nbsp;(${WD[g]})</span>`;
+  $('dPick').value = ds(cur);
+  setNum($('total'), day.total, srcVal('total'));
+  const rows = $('rows'); rows.innerHTML = '';
+  for (const c of data.cats) {
+    const r = document.createElement('div'); r.className = 'row';
+    const memo = day.memo[c.key] || '';
+    r.innerHTML = `<div class="nm">${esc(c.name)}<button class="mbtn" data-memo="${c.key}">📝${memo ? '' : ' 메모'}</button>
+        ${memo ? `<span class="memo">${esc(memo)}</span>` : ''}</div>
+      <div class="stepper"><button data-k="${c.key}" data-d="-1">−</button><input class="num" data-key="${c.key}" inputmode="numeric" pattern="[0-9]*"><button data-k="${c.key}" data-d="1">+</button></div>`;
+    rows.appendChild(r);
+    setNum(r.querySelector('input'), day.v[c.key], srcVal(c.key));
+  }
+  calc();
+}
+function srcVal(k) {
+  if (saved || !srcKey) return undefined;
+  const s = data.days[srcKey];
+  return k === 'total' ? s.total : (s.v || {})[k];
+}
+function setNum(inp, v, _src) { inp.value = (v === null || v === undefined || v === '') ? '' : String(v); inp.classList.remove('changed'); }
+function esc(s) { return String(s).replace(/[&<>"]/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[m])); }
+
+function calc() {
+  const s = sumIn();
+  $('inSum').innerHTML = `${s}<small>명</small>`;
+  const t = day.total;
+  const o = $('outTxt');
+  if (t === null || t === undefined || t === '') { o.textContent = '총원을 넣으세요'; o.className = 'sub'; }
+  else if (s > t) { o.textContent = `⚠ 투입이 총원보다 ${s - t}명 많음`; o.className = 'sub bad'; }
+  else { o.textContent = `미투입 ${t - s}명`; o.className = 'sub'; }
+  const st = $('state');
+  if (dirty) { st.className = 'state dirty'; st.textContent = '✏️ 바뀐 내용이 있습니다 — [💾 저장] 을 누르세요'; }
+  else if (saved) {
+    const at = (data.days[ds(cur)] || {}).saved_at;
+    st.className = 'state saved'; st.textContent = `✔ 저장된 날입니다${at ? ' · ' + at : ''}`;
+  } else if (srcKey) {
+    st.className = 'state prev'; st.textContent = `📋 전일 ${label(fromDs(srcKey))} 값으로 채웠습니다 — 바뀐 것만 고치고 [💾 저장] (그대로면 바로 저장)`;
+  } else { st.className = 'state empty'; st.textContent = '아직 입력한 날이 없습니다 — 숫자를 넣고 [💾 저장]'; }
+  $('bSave').classList.toggle('dim', saved && !dirty);
+}
+
+function setVal(k, v) {
+  if (v !== null) v = Math.max(0, Math.min(999, v));
+  if (k === 'total') day.total = v; else { if (v === null) delete day.v[k]; else day.v[k] = v; }
+  dirty = true;
+  const inp = k === 'total' ? $('total') : document.querySelector(`input[data-key="${k}"]`);
+  inp.value = v === null ? '' : String(v);
+  inp.classList.add('changed');
+  calc();
+}
+
+/* ± 단추 · 숫자 칸 */
+document.addEventListener('click', e => {
+  const b = e.target.closest('button[data-d]');
+  if (b) {
+    const k = b.dataset.k, d = Number(b.dataset.d);
+    const now = k === 'total' ? day.total : day.v[k];
+    const base = (now === null || now === undefined || now === '') ? 0 : Number(now);
+    setVal(k, (now === null || now === undefined || now === '') && d < 0 ? 0 : base + d);
+    if (navigator.vibrate) navigator.vibrate(8);
+    return;
+  }
+  const m = e.target.closest('button[data-memo]');
+  if (m) memoSheet(m.dataset.memo);
+});
+document.addEventListener('input', e => {
+  const inp = e.target;
+  if (!inp.classList.contains('num')) return;
+  const k = inp.id === 'total' ? 'total' : inp.dataset.key;
+  const t = inp.value.replace(/\D/g, '');
+  if (t !== inp.value) inp.value = t;
+  if (k === 'total') day.total = t === '' ? null : Number(t); else { if (t === '') delete day.v[k]; else day.v[k] = Number(t); }
+  dirty = true; inp.classList.add('changed'); calc();
+});
+document.addEventListener('focusin', e => { if (e.target.classList.contains('num')) setTimeout(() => e.target.select(), 0); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList.contains('num')) {
+    const all = [...document.querySelectorAll('.num')]; const i = all.indexOf(e.target);
+    (all[i + 1] || e.target).focus(); if (!all[i + 1]) e.target.blur(); e.preventDefault();
+  }
+});
+
+/* 저장 */
+function save() {
+  if (day.total === null && !Object.keys(day.v).length) { toast('입력한 숫자가 없습니다'); return; }
+  const now = new Date();
+  data.days[ds(cur)] = {total: day.total, v: {...day.v}, memo: {...day.memo},
+    saved_at: `${ds(now)} ${pad(now.getHours())}:${pad(now.getMinutes())} (폰)`};
+  persist(); saved = true; dirty = false; srcKey = null;
+  document.querySelectorAll('.num.changed').forEach(x => x.classList.remove('changed'));
+  calc(); toast(`${label(cur)} 저장했습니다`);
+}
+$('bSave').onclick = save;
+
+/* 날짜 이동 (바뀐 게 있으면 물어봄) */
+function go(d) {
+  if (dirty && !confirm(`${label(cur)} 바뀐 내용을 저장하지 않았습니다.\n저장하지 않고 이동할까요?`)) return;
+  showDate(d);
+}
+$('bPrev').onclick = () => go(addDays(cur, -1));
+$('bNext').onclick = () => go(addDays(cur, 1));
+$('bToday').onclick = () => { const t = new Date(); t.setHours(0, 0, 0, 0); go(t); };
+$('dPick').onchange = e => { if (e.target.value) go(fromDs(e.target.value)); };
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ───── 시트 ───── */
+function openSheet(html) {
+  $('sheet').innerHTML = html; $('sheetBg').style.display = 'block';
+  requestAnimationFrame(() => $('sheet').classList.add('open'));
+}
+function closeSheet() { $('sheet').classList.remove('open'); setTimeout(() => $('sheetBg').style.display = 'none', 200); }
+$('sheetBg').onclick = closeSheet;
+
+function memoSheet(k) {
+  const c = data.cats.find(x => x.key === k);
+  openSheet(`<h2>📝 ${esc(c.name)} 메모</h2>
+    <div class="hint">현황판에 '${esc(c.name)}(메모)' 로 함께 나옵니다. 예) BOX 포장작업</div>
+    <div class="field"><input id="mIn" value="${esc(day.memo[k] || '')}" placeholder="메모 (비우면 지움)"></div>
+    <div class="btnrow"><button class="btn2" onclick="closeSheet()">취소</button><button class="btn1" id="mOk">확인</button></div>`);
+  setTimeout(() => $('mIn').focus(), 250);
+  $('mOk').onclick = () => {
+    const v = $('mIn').value.trim();
+    if (v) day.memo[k] = v; else delete day.memo[k];
+    dirty = true; closeSheet(); render(); dirty = true; calc();
+  };
+}
+
+$('bMore').onclick = () => openSheet(`<h2>메뉴</h2>
+  <button class="item" id="mCal"><span class="ic">📅</span><span>달력에서 날짜 고르기<small>입력한 날은 초록 · 숫자 = 투입인원</small></span></button>
+  <button class="item" id="mPrev"><span class="ic">📋</span><span>전일 값 다시 불러오기<small>지금 화면 숫자를 전일 값으로 덮어씀</small></span></button>
+  <button class="item" id="mCats"><span class="ic">⚙️</span><span>공정 이름 바꾸기</span></button>
+  <button class="item" id="mExp"><span class="ic">💾</span><span>백업 내보내기<small>PC 인원배치현황판의 투입인원_data.json 과 같은 모양</small></span></button>
+  <button class="item" id="mImp"><span class="ic">📂</span><span>백업 · PC 자료 가져오기<small>투입인원_data.json 또는 백업 파일</small></span></button>
+  <button class="item danger" id="mDel"><span class="ic">🗑</span><span>이 날짜 기록 지우기</span></button>
+  <div class="hint" style="margin-top:10px">인원배치현황판 ${APP_VERSION} · 저장된 날 ${Object.keys(data.days).length}일 · 자료는 이 폰 안에만 저장됩니다
+  <button class="btn2" style="padding:4px 10px;border-radius:8px;margin-left:6px" id="mUpd">업데이트 확인</button></div>`)
+  || bindMenu();
+function bindMenu() {
+  $('mCal').onclick = () => calSheet(cur.getFullYear(), cur.getMonth());
+  $('mPrev').onclick = () => {
+    const k = prevSource(cur); closeSheet();
+    if (!k) { toast('전일 기록이 없습니다'); return; }
+    const s = data.days[k];
+    day = {total: s.total ?? null, v: {...(s.v || {})}, memo: {...(s.memo || {})}};
+    render(); dirty = true; document.querySelectorAll('.num').forEach(x => x.classList.add('changed')); calc();
+    toast(`${label(fromDs(k))} 값으로 채웠습니다`);
+  };
+  $('mCats').onclick = catsSheet;
+  $('mExp').onclick = () => { closeSheet(); exportData(); };
+  $('mImp').onclick = () => { closeSheet(); importData(); };
+  $('mDel').onclick = () => {
+    closeSheet();
+    if (!data.days[ds(cur)]) { toast('이 날은 저장된 기록이 없습니다'); return; }
+    if (!confirm(`${label(cur)} 기록을 지울까요?`)) return;
+    delete data.days[ds(cur)]; persist(); showDate(cur); toast('지웠습니다');
+  };
+  $('mUpd').onclick = () => checkUpdate(true);
+}
+$('bCal').onclick = () => calSheet(cur.getFullYear(), cur.getMonth());
+
+function calSheet(y, m) {
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0).getDate();
+  let cells = [...WD].map((w, i) => `<div class="w" style="color:${i === 0 ? 'var(--red)' : i === 6 ? 'var(--blue)' : ''}">${w}</div>`).join('');
+  for (let i = 0; i < first.getDay(); i++) cells += '<div class="d blank"></div>';
+  for (let d = 1; d <= last; d++) {
+    const dt = new Date(y, m, d), k = ds(dt), x = data.days[k], g = dt.getDay();
+    const n = x ? data.cats.reduce((a, c) => a + (Number((x.v || {})[c.key]) || 0), 0) : null;
+    cells += `<button class="d ${x ? 'has' : ''} ${k === ds(cur) ? 'cur' : ''} ${g === 0 ? 'sun' : g === 6 ? 'sat' : ''}" data-day="${k}">${d}${x ? `<span class="n">${n}</span>` : ''}</button>`;
+  }
+  openSheet(`<div class="cal-h"><button id="cP">◀</button><h2 style="margin:0">${y}년 ${m + 1}월</h2><button id="cN">▶</button></div>
+    <div class="cal">${cells}</div><div class="hint">초록 = 저장한 날 (숫자 = 투입인원)</div>`);
+  $('cP').onclick = () => calSheet(m ? y : y - 1, m ? m - 1 : 11);
+  $('cN').onclick = () => calSheet(m === 11 ? y + 1 : y, m === 11 ? 0 : m + 1);
+  document.querySelectorAll('.cal .d[data-day]').forEach(b => b.onclick = () => { closeSheet(); go(fromDs(b.dataset.day)); });
+}
+
+function catsSheet() {
+  openSheet(`<h2>⚙️ 공정 이름</h2><div class="hint">이름만 바뀌고 입력한 숫자는 그대로입니다.</div>
+    ${data.cats.map((c, i) => `<div class="field"><label>${i + 1}</label><input data-ck="${c.key}" value="${esc(c.name)}"></div>`).join('')}
+    <div class="btnrow"><button class="btn2" onclick="closeSheet()">취소</button><button class="btn1" id="ckOk">저장</button></div>`);
+  $('ckOk').onclick = () => {
+    document.querySelectorAll('input[data-ck]').forEach(inp => {
+      const c = data.cats.find(x => x.key === inp.dataset.ck); if (inp.value.trim()) c.name = inp.value.trim();
+    });
+    persist(); closeSheet(); render(); toast('공정 이름을 바꿨습니다');
+  };
+}
+
+/* 백업 */
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type: 'application/json'})); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+async function exportData() {
+  const name = `투입인원_data_${ds(new Date())}.json`, text = JSON.stringify(data, null, 1);
+  const file = new File([text], name, {type: 'application/json'});
+  if (navigator.canShare && navigator.canShare({files: [file]})) {
+    try { await navigator.share({files: [file], title: '인원배치 백업'}); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  download(name, text); toast('다운로드 폴더에 저장했습니다');
+}
+function importData() {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    let d; try { d = JSON.parse(await f.text()); } catch { alert('JSON 파일을 읽지 못했습니다.'); return; }
+    if (!d || typeof d.days !== 'object') { alert('인원배치 자료(투입인원_data.json) 가 아닙니다.'); return; }
+    const ks = Object.keys(d.days), same = ks.filter(k => data.days[k]);
+    let over = true;
+    if (same.length) over = confirm(`가져올 날 ${ks.length}일 중 ${same.length}일은 이 폰에도 있습니다.\n\n[확인] 파일 값으로 덮어쓰기\n[취소] 이 폰 값 그대로 두고 없는 날만 더하기`);
+    let n = 0;
+    for (const k of ks) if (over || !data.days[k]) { data.days[k] = d.days[k]; n++; }
+    if (Array.isArray(d.cats) && d.cats.length && confirm('파일의 공정 이름도 가져올까요?')) data.cats = d.cats;
+    persist(); showDate(cur); toast(`${n}일 가져왔습니다`);
+  };
+  inp.click();
+}
+
+/* ───── 카톡 공유 : 종이 현황판 모양 그림 ───── */
+function boardImage() {
+  const W = 1080, rowH = 104, top = 480, n = data.cats.length, H = top + 70 + n * rowH + 130;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d'), F = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#111'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = `800 64px ${F}`; x.fillText('인원배치현황판', W / 2, 90);
+  x.textAlign = 'right'; x.font = `600 36px ${F}`;
+  x.fillText(`날짜 :  ${cur.getFullYear()}년 ${cur.getMonth() + 1}월 ${cur.getDate()}일 (${WD[cur.getDay()]})`, W - 70, 180);
+  x.fillRect(60, 215, W - 120, 5);
+  // 총원 · 투입인원
+  x.lineWidth = 5; x.strokeStyle = '#111'; x.strokeRect(70, 250, W - 140, 200);
+  x.beginPath(); x.moveTo(W / 2, 250); x.lineTo(W / 2, 450); x.stroke();
+  const s = sumIn(), t = day.total;
+  x.textAlign = 'center'; x.font = `700 34px ${F}`; x.fillText('총원', W / 4 + 18, 290); x.fillText('투입인원', W * 3 / 4 - 18, 290);
+  x.font = `800 72px ${F}`; x.fillStyle = '#1e3a8a';
+  x.fillText(t === null || t === undefined ? '-' : String(t), W / 4 + 18, 362); x.fillText(String(s), W * 3 / 4 - 18, 362);
+  x.fillStyle = '#111'; x.font = `700 32px ${F}`; x.fillText('명', W / 4 + 110, 365); x.fillText('명', W * 3 / 4 + 75, 365);
+  if (t !== null && t !== undefined && t !== '') { x.font = `500 26px ${F}`; x.fillStyle = '#555'; x.fillText(`미투입 ${Math.max(0, t - s)}명`, W * 3 / 4 - 18, 422); }
+  // 공정 표
+  const L = 70, R = W - 70, mid = W / 2;
+  x.fillStyle = '#1f2937'; x.fillRect(L, top, R - L, 70);
+  x.fillStyle = '#fff'; x.font = `700 32px ${F}`; x.fillText('공정', (L + mid) / 2, top + 36); x.fillText('인원', (mid + R) / 2, top + 36);
+  x.strokeStyle = '#1e3a8a'; x.lineWidth = 2.5;
+  data.cats.forEach((c, i) => {
+    const y = top + 70 + i * rowH;
+    x.strokeRect(L, y, R - L, rowH);
+    x.beginPath(); x.moveTo(mid, y); x.lineTo(mid, y + rowH); x.stroke();
+    const memo = day.memo[c.key];
+    x.fillStyle = '#111'; x.textAlign = 'left'; x.font = `700 36px ${F}`;
+    let nm = c.name + (memo ? ` (${memo})` : '');
+    let fs = 36; while (x.measureText(nm).width > mid - L - 60 && fs > 20) { fs -= 2; x.font = `700 ${fs}px ${F}`; }
+    x.fillText(nm, L + 40, y + rowH / 2);
+    const v = day.v[c.key];
+    x.textAlign = 'center'; x.font = `800 52px ${F}`; x.fillStyle = '#1e3a8a';
+    x.fillText(v === undefined || v === null ? '' : String(v), (mid + R) / 2 - 20, y + rowH / 2);
+    x.beginPath(); x.moveTo((mid + R) / 2 - 80, y + rowH / 2 + 32); x.lineTo((mid + R) / 2 + 40, y + rowH / 2 + 32); x.strokeStyle = '#333'; x.lineWidth = 2; x.stroke();
+    x.strokeStyle = '#1e3a8a'; x.lineWidth = 2.5;
+    x.fillStyle = '#111'; x.font = `700 32px ${F}`; x.fillText('명', (mid + R) / 2 + 80, y + rowH / 2 + 4);
+  });
+  x.textAlign = 'right'; x.fillStyle = '#111'; x.font = `800 44px ${F}`; x.fillText('T&S', R, H - 60);
+  return cv;
+}
+function boardText() {
+  const s = sumIn(), t = day.total;
+  const lines = [`[인원배치현황] ${cur.getFullYear()}.${cur.getMonth() + 1}.${cur.getDate()}(${WD[cur.getDay()]})`,
+    `총원 ${t ?? '-'}명 / 투입 ${s}명${t !== null && t !== undefined ? ` / 미투입 ${Math.max(0, t - s)}명` : ''}`];
+  for (const c of data.cats) {
+    const v = day.v[c.key], m = day.memo[c.key];
+    if ((v === undefined || v === null) && !m) continue;
+    lines.push(`· ${c.name}${m ? `(${m})` : ''} ${v ?? '-'}명`);
+  }
+  return lines.join('\n');
+}
+$('bShare').onclick = async () => {
+  if (dirty && confirm('바뀐 내용을 먼저 저장할까요?')) save();
+  const cv = boardImage();
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  const name = `인원배치현황판_${ds(cur)}.png`;
+  const file = new File([blob], name, {type: 'image/png'});
+  if (navigator.canShare && navigator.canShare({files: [file]})) {
+    try { await navigator.share({files: [file], text: boardText()}); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  if (navigator.share) { try { await navigator.share({text: boardText()}); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  try { await navigator.clipboard.writeText(boardText()); } catch {}
+  toast('그림을 저장하고 글은 복사했습니다');
+};
+
+/* ───── 업데이트 · 오프라인 ───── */
+async function checkUpdate(manual) {
+  try {
+    const r = await fetch('./index.html?ts=' + Date.now(), {cache: 'no-store'});
+    const m = /const APP_VERSION = '([^']+)'/.exec(await r.text());
+    try { const reg = await navigator.serviceWorker?.getRegistration(); await reg?.update(); } catch {}
+    const v = m && m[1];
+    if (!v || v === APP_VERSION) { if (manual) toast(`최신 버전입니다 (${APP_VERSION})`); return; }
+    if (manual || confirm(`새 버전 ${v} 이 있습니다. 지금 바꿀까요?`)) location.reload();
+  } catch { if (manual) toast('인터넷 연결을 확인하세요'); }
+}
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  const had = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', {updateViaCache: 'none'}).then(reg => reg.update()).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !dirty) location.reload(); });
+}
+
+showDate(cur);
+</script>
+</body>
+</html>
