@@ -41,6 +41,8 @@ input{font:inherit;color:inherit}
 .state.prev{background:#fff4dd;color:#7a4b00}
 .state.dirty{background:#fde8e8;color:#8f1d1d}
 .state.empty{background:#eceff4;color:var(--ink2)}
+.prevbtn{display:block;width:calc(100% - 24px);margin:8px 12px 0;height:48px;border-radius:12px;background:#fff;border:2px solid var(--navy2);color:var(--navy);font-weight:800;font-size:16px}
+.prevbtn:active{background:var(--chip)}
 
 /* 현황판 */
 .board{margin:10px 12px;background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden}
@@ -127,6 +129,7 @@ input{font:inherit;color:inherit}
 </div>
 
 <div class="state empty" id="state"></div>
+<button class="prevbtn" id="bLoadPrev"></button>
 
 <div class="board">
   <div class="sum">
@@ -157,7 +160,7 @@ input{font:inherit;color:inherit}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v1.0.0';
+const APP_VERSION = 'v1.1.0';
 const KEY = 'personnel-board-v2';
 const WD = '일월화수목금토';
 const DEFAULT_CATS = ['관리', '납품', '조립', '가공', '보온', 'PIPE', '설계', '기타1', '기타2'];
@@ -216,6 +219,20 @@ function showDate(d) {
   render();
 }
 
+/* 어제(전일) 값을 지금 날짜로 — 저장된 날이면 물어보고 덮어씀, [💾 저장] 해야 확정 */
+function loadPrev() {
+  const k = prevSource(cur);
+  if (!k) { toast('전일 기록이 없습니다'); return; }
+  if ((saved || dirty) && !confirm(`${label(cur)} 화면 숫자를 ${label(fromDs(k))} 값으로 바꿀까요?\n(바꾼 뒤 [💾 저장] 해야 확정됩니다)`)) return;
+  const s = data.days[k];
+  day = {total: s.total ?? null, v: {...(s.v || {})}, memo: {...(s.memo || {})}};
+  render(); dirty = true;
+  document.querySelectorAll('.num').forEach(x => x.classList.add('changed'));
+  calc();
+  toast(`${label(fromDs(k))} 값으로 채웠습니다 — 고칠 것 고치고 [💾 저장]`);
+}
+document.getElementById('bLoadPrev').onclick = loadPrev;
+
 function sumIn() { return data.cats.reduce((a, c) => a + (Number(day.v[c.key]) || 0), 0); }
 
 function render() {
@@ -260,6 +277,9 @@ function calc() {
     st.className = 'state prev'; st.textContent = `📋 전일 ${label(fromDs(srcKey))} 값으로 채웠습니다 — 바뀐 것만 고치고 [💾 저장] (그대로면 바로 저장)`;
   } else { st.className = 'state empty'; st.textContent = '아직 입력한 날이 없습니다 — 숫자를 넣고 [💾 저장]'; }
   $('bSave').classList.toggle('dim', saved && !dirty);
+  const pk = prevSource(cur), pb = $('bLoadPrev');
+  pb.style.display = pk ? 'block' : 'none';
+  if (pk) pb.textContent = `📋 ${pk === ds(addDays(cur, -1)) ? '어제' : '전일'} ${label(fromDs(pk))} 값 불러오기`;
 }
 
 function setVal(k, v) {
@@ -360,14 +380,7 @@ $('bMore').onclick = () => openSheet(`<h2>메뉴</h2>
   || bindMenu();
 function bindMenu() {
   $('mCal').onclick = () => calSheet(cur.getFullYear(), cur.getMonth());
-  $('mPrev').onclick = () => {
-    const k = prevSource(cur); closeSheet();
-    if (!k) { toast('전일 기록이 없습니다'); return; }
-    const s = data.days[k];
-    day = {total: s.total ?? null, v: {...(s.v || {})}, memo: {...(s.memo || {})}};
-    render(); dirty = true; document.querySelectorAll('.num').forEach(x => x.classList.add('changed')); calc();
-    toast(`${label(fromDs(k))} 값으로 채웠습니다`);
-  };
+  $('mPrev').onclick = () => { closeSheet(); loadPrev(); };
   $('mCats').onclick = catsSheet;
   $('mExp').onclick = () => { closeSheet(); exportData(); };
   $('mImp').onclick = () => { closeSheet(); importData(); };
