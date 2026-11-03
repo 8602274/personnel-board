@@ -65,6 +65,11 @@ input{font:inherit;color:inherit}
 .row{display:grid;grid-template-columns:1fr 172px;border-top:1px solid var(--line);align-items:center;min-height:64px}
 .row .nm{padding:8px 12px;font-size:17px;font-weight:700}
 .row .nm .memo{display:block;font-size:13px;font-weight:400;color:var(--warn);margin-top:2px;word-break:break-all}
+.row .nm.etc{display:flex;align-items:center;gap:6px;min-width:0}
+.bigo{flex:1;min-width:0;height:34px;border:0;border-bottom:2px solid #333;border-radius:0;background:transparent;
+  font-size:15px;font-weight:600;color:var(--warn);padding:0 2px}
+.bigo:focus{outline:none;border-bottom-color:var(--navy2)}
+.bigo::placeholder{color:#b7bdc8;font-weight:400}
 .row .nm .mbtn{font-size:12px;font-weight:400;color:var(--ink2);margin-left:6px;padding:2px 6px;border-radius:8px;background:#f1f3f7}
 .row .stepper{margin:0;gap:4px}
 .row .stepper button{width:42px;height:42px;font-size:22px}
@@ -160,7 +165,7 @@ input{font:inherit;color:inherit}
 <div class="toast" id="toast"></div>
 
 <script>
-const APP_VERSION = 'v1.1.0';
+const APP_VERSION = 'v1.2.0';
 const KEY = 'personnel-board-v2';
 const WD = '일월화수목금토';
 const DEFAULT_CATS = ['관리', '납품', '조립', '가공', '보온', 'PIPE', '설계', '기타1', '기타2'];
@@ -233,6 +238,8 @@ function loadPrev() {
 }
 document.getElementById('bLoadPrev').onclick = loadPrev;
 
+function isEtc(c) { return c.key === 'c8' || c.key === 'c9' || String(c.name).startsWith('기타'); }
+
 function sumIn() { return data.cats.reduce((a, c) => a + (Number(day.v[c.key]) || 0), 0); }
 
 function render() {
@@ -244,11 +251,14 @@ function render() {
   for (const c of data.cats) {
     const r = document.createElement('div'); r.className = 'row';
     const memo = day.memo[c.key] || '';
-    r.innerHTML = `<div class="nm">${esc(c.name)}<button class="mbtn" data-memo="${c.key}">📝${memo ? '' : ' 메모'}</button>
-        ${memo ? `<span class="memo">${esc(memo)}</span>` : ''}</div>
+    const nmHtml = isEtc(c)          // 기타 : 이름 옆 밑줄 칸에 비고를 바로 씀
+      ? `<div class="nm etc">${esc(c.name)}<input class="bigo" data-bigo="${c.key}" value="${esc(memo)}" placeholder="비고 (예: BOX 포장작업)"></div>`
+      : `<div class="nm">${esc(c.name)}<button class="mbtn" data-memo="${c.key}">📝${memo ? '' : ' 메모'}</button>
+        ${memo ? `<span class="memo">${esc(memo)}</span>` : ''}</div>`;
+    r.innerHTML = `${nmHtml}
       <div class="stepper"><button data-k="${c.key}" data-d="-1">−</button><input class="num" data-key="${c.key}" inputmode="numeric" pattern="[0-9]*"><button data-k="${c.key}" data-d="1">+</button></div>`;
     rows.appendChild(r);
-    setNum(r.querySelector('input'), day.v[c.key], srcVal(c.key));
+    setNum(r.querySelector('input.num'), day.v[c.key], srcVal(c.key));
   }
   calc();
 }
@@ -308,6 +318,11 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const inp = e.target;
+  if (inp.classList.contains('bigo')) {          // 기타 비고 밑줄 칸
+    const v = inp.value.trim(), k = inp.dataset.bigo;
+    if (v) day.memo[k] = v; else delete day.memo[k];
+    dirty = true; calc(); return;
+  }
   if (!inp.classList.contains('num')) return;
   const k = inp.id === 'total' ? 'total' : inp.dataset.key;
   const t = inp.value.replace(/\D/g, '');
@@ -484,9 +499,21 @@ function boardImage() {
     x.beginPath(); x.moveTo(mid, y); x.lineTo(mid, y + rowH); x.stroke();
     const memo = day.memo[c.key];
     x.fillStyle = '#111'; x.textAlign = 'left'; x.font = `700 36px ${F}`;
-    let nm = c.name + (memo ? ` (${memo})` : '');
-    let fs = 36; while (x.measureText(nm).width > mid - L - 60 && fs > 20) { fs -= 2; x.font = `700 ${fs}px ${F}`; }
-    x.fillText(nm, L + 40, y + rowH / 2);
+    if (isEtc(c)) {                  // 기타 : 이름 옆 밑줄 위에 비고
+      x.fillText(c.name, L + 40, y + rowH / 2);
+      const u0 = L + 40 + x.measureText(c.name).width + 16, u1 = mid - 24;
+      x.beginPath(); x.moveTo(u0, y + rowH / 2 + 30); x.lineTo(u1, y + rowH / 2 + 30); x.strokeStyle = '#333'; x.lineWidth = 2; x.stroke();
+      x.strokeStyle = '#1e3a8a'; x.lineWidth = 2.5;
+      if (memo) {
+        let fs = 32; x.font = `600 ${fs}px ${F}`;
+        while (x.measureText(memo).width > u1 - u0 - 8 && fs > 16) { fs -= 2; x.font = `600 ${fs}px ${F}`; }
+        x.fillStyle = '#9a4a00'; x.textAlign = 'center'; x.fillText(memo, (u0 + u1) / 2, y + rowH / 2 + 4);
+      }
+    } else {
+      let nm = c.name + (memo ? ` (${memo})` : '');
+      let fs = 36; while (x.measureText(nm).width > mid - L - 60 && fs > 20) { fs -= 2; x.font = `700 ${fs}px ${F}`; }
+      x.fillText(nm, L + 40, y + rowH / 2);
+    }
     const v = day.v[c.key];
     x.textAlign = 'center'; x.font = `800 52px ${F}`; x.fillStyle = '#1e3a8a';
     x.fillText(v === undefined || v === null ? '' : String(v), (mid + R) / 2 - 20, y + rowH / 2);
